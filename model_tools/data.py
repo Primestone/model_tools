@@ -3,7 +3,6 @@
 """
 DataHelper
 
-@author: Moon
 """
 import pandas as pd
 from .utils import is_numpy
