@@ -3,7 +3,6 @@
 """
 Prepeocessing Encoders
 
-@author: Moon
 """
 
 import numpy as np
