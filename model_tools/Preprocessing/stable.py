@@ -106,12 +106,20 @@ class stable_evalutor(object):
             return (grouped)
 
     @staticmethod
-    def get_trend_changes(grouped_data, feature, target_col, threshold=0.03, proc_na=True):
+    def get_trend_changes(
+            grouped_data,
+            feature,
+            target_col,
+            threshold=0.03,
+            proc_na=True):
         if not proc_na:
-            grouped_data = grouped_data.loc[grouped_data[feature] != 'Nulls', :].reset_index(drop=True)
+            grouped_data = grouped_data.loc[grouped_data[feature] != 'Nulls', :].reset_index(
+                drop=True)
         target_diffs = grouped_data[target_col + '_mean'].diff()
-        target_diffs = target_diffs[~np.isnan(target_diffs)].reset_index(drop=True)
-        max_diff = grouped_data[target_col + '_mean'].max() - grouped_data[target_col + '_mean'].min()
+        target_diffs = target_diffs[~np.isnan(
+            target_diffs)].reset_index(drop=True)
+        max_diff = grouped_data[target_col + '_mean'].max() - \
+            grouped_data[target_col + '_mean'].min()
         target_diffs_mod = target_diffs.fillna(0).abs()
         low_change = target_diffs_mod < threshold * max_diff
         target_diffs_norm = target_diffs.divide(target_diffs_mod)
@@ -119,17 +127,27 @@ class stable_evalutor(object):
         target_diffs_norm = target_diffs_norm[target_diffs_norm != 0]
         target_diffs_lvl2 = target_diffs_norm.diff()
         changes = target_diffs_lvl2.fillna(0).abs() / 2
-        tot_trend_changes = int(changes.sum()) if ~np.isnan(changes.sum()) else 0
+        tot_trend_changes = int(
+            changes.sum()) if ~np.isnan(
+            changes.sum()) else 0
         return (tot_trend_changes)
 
     @staticmethod
-    def get_trend_correlation(grouped, grouped_test, feature, target_col, proc_na=True):
+    def get_trend_correlation(
+            grouped,
+            grouped_test,
+            feature,
+            target_col,
+            proc_na=True):
         if not proc_na:
-            grouped = grouped[grouped[feature] != 'Nulls'].reset_index(drop=True)
-            grouped_test = grouped_test[grouped_test[feature] != 'Nulls'].reset_index(drop=True)
+            grouped = grouped[grouped[feature] !=
+                              'Nulls'].reset_index(drop=True)
+            grouped_test = grouped_test[grouped_test[feature] != 'Nulls'].reset_index(
+                drop=True)
 
         if grouped_test.loc[0, feature] != grouped.loc[0, feature]:
-            grouped_test[feature] = grouped_test[feature].cat.add_categories(grouped.loc[0, feature])
+            grouped_test[feature] = grouped_test[feature].cat.add_categories(
+                grouped.loc[0, feature])
             grouped_test.loc[0, feature] = grouped.loc[0, feature]
         grouped_test_train = grouped.merge(grouped_test[[feature, target_col + '_mean']], on=feature, how='left',
                                            suffixes=('', '_test'))
@@ -141,58 +159,81 @@ class stable_evalutor(object):
                                             grouped_test_train[target_col + '_mean_test'])[0, 1]
         else:
             trend_correlation = 0
-            print("Only one bin created for " + feature + ". Correlation can't be calculated")
+            print(
+                "Only one bin created for " +
+                feature +
+                ". Correlation can't be calculated")
 
         return (trend_correlation)
 
     @staticmethod
-    def get_trend_stats(self, data, target_col, features_list=0, bins=10, data_test=0, method='tree', proc_na=True):
-        if type(features_list) == int:
+    def get_trend_stats(
+            self,
+            data,
+            target_col,
+            features_list=0,
+            bins=10,
+            data_test=0,
+            method='tree',
+            proc_na=True):
+        if isinstance(features_list, int):
             features_list = list(data.columns)
             features_list.remove(target_col)
 
         stats_all = []
-        has_test = type(data_test) == pd.core.frame.DataFrame
+        has_test = isinstance(data_test, pd.core.frame.DataFrame)
         ignored = []
         for feature in features_list:
             try:
                 if data[feature].dtype == 'O' or feature == target_col:
                     ignored.append(feature)
                 else:
-                    cuts, grouped = self.get_grouped_data(input_data=data, feature=feature, target_col=target_col, bins=bins,
-                                                     method=method)
-                    trend_changes = self.get_trend_changes(grouped_data=grouped, feature=feature, target_col=target_col, proc_na=proc_na)
+                    cuts, grouped = self.get_grouped_data(
+                        input_data=data, feature=feature, target_col=target_col, bins=bins, method=method)
+                    trend_changes = self.get_trend_changes(
+                        grouped_data=grouped, feature=feature, target_col=target_col, proc_na=proc_na)
                     if has_test:
-                        grouped_test = self.get_grouped_data(input_data=data_test.reset_index(drop=True), feature=feature,
-                                                        target_col=target_col, bins=bins, cuts=cuts, method=method)
-                        trend_corr = self.get_trend_correlation(grouped, grouped_test, feature, target_col, proc_na=proc_na)
-                        trend_changes_test = self.get_trend_changes(grouped_data=grouped_test, feature=feature,
-                                                               target_col=target_col, proc_na=proc_na)
-                        stats = [feature, trend_changes, trend_changes_test, trend_corr]
+                        grouped_test = self.get_grouped_data(
+                            input_data=data_test.reset_index(
+                                drop=True),
+                            feature=feature,
+                            target_col=target_col,
+                            bins=bins,
+                            cuts=cuts,
+                            method=method)
+                        trend_corr = self.get_trend_correlation(
+                            grouped, grouped_test, feature, target_col, proc_na=proc_na)
+                        trend_changes_test = self.get_trend_changes(
+                            grouped_data=grouped_test, feature=feature, target_col=target_col, proc_na=proc_na)
+                        stats = [
+                            feature,
+                            trend_changes,
+                            trend_changes_test,
+                            trend_corr]
                     else:
                         stats = [feature, trend_changes]
                     stats_all.append(stats)
-            except:
+            except BaseException:
                 continue
         stats_all_df = pd.DataFrame(stats_all)
         try:
-            stats_all_df.columns = ['Feature', 'Trend_changes'] if has_test == False else ['Feature', 'Trend_changes',
-                                                                                           'Trend_changes_test',
-                                                                                           'Trend_correlation']
-        except:
+            stats_all_df.columns = ['Feature', 'Trend_changes'] if has_test == False else [
+                'Feature', 'Trend_changes', 'Trend_changes_test', 'Trend_correlation']
+        except BaseException:
             pass
 
         if len(ignored) > 0:
-            print('Categorical features ' + str(ignored) + ' ignored. Categorical features not supported yet.')
+            print('Categorical features ' + str(ignored) +
+                  ' ignored. Categorical features not supported yet.')
 
         print('Returning stats for all numeric features')
 
         @property
         def stats(self):
             stats = self.get_trend_stats(data=self.train,
-            target_col=self.target,
-            bins=8,
-            data_test=self.test,
-            method='tree',
-            proc_na=True)
+                                         target_col=self.target,
+                                         bins=8,
+                                         data_test=self.test,
+                                         method='tree',
+                                         proc_na=True)
         return stats_all_df
