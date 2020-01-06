@@ -2,8 +2,6 @@
 
 """
 pipeline tools
-
-@author: Moon
 """
 
 from .utils import is_pandas
