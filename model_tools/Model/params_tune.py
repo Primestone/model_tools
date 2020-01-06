@@ -10,7 +10,6 @@ from functools import partial
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 from lightgbm.sklearn import LGBMClassifier
-from xgboost.sklearn import XGBClassifier
 from bayes_opt import BayesianOptimization
 
 
