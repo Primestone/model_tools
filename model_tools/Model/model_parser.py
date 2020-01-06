@@ -29,7 +29,8 @@ def tree_parser(row, model, feature_names):
             threshold = tree.get('threshold')
             default_left = tree.get('default_left')
             split_feature = feature_names[tree['split_feature']]
-            next_decison = decision(row[split_feature], threshold, default_left)
+            next_decison = decision(
+                row[split_feature], threshold, default_left)
             tree = tree[next_decison]
             if tree.get('left_child', 'not found') == 'not found':
                 score = score + tree['leaf_value']
@@ -41,8 +42,13 @@ def paralell_predict(input_args):
     data = input_args[0]
     model = input_args[1]
     feature_names = model['feature_names']
-    predict = Parallel(n_jobs=2)(
-            delayed(tree_parser)(v, model, feature_names) for k, v in data.iterrows())
+    predict = Parallel(
+        n_jobs=2)(
+        delayed(tree_parser)(
+            v,
+            model,
+            feature_names) for k,
+        v in data.iterrows())
     #predict = data.apply(lambda x: tree_parser(x, model, feature_names), axis=1).values
     return np.array(predict)
 
@@ -51,7 +57,8 @@ def transformer(json_path, test_df):
     start_time = time.time()
     model_file = json.load(open(json_path, "rb"))
     n = len(model_file)
-    input_args = [[test_df, model_file['fold{0}_tree'.format(i)]] for i in range(1, n)]
+    input_args = [
+        [test_df, model_file['fold{0}_tree'.format(i)]] for i in range(1, n)]
     cpu_count = os.cpu_count()
     with Pool(cpu_count) as p:
         process_result = p.map(paralell_predict, input_args)
