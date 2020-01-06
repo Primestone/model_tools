@@ -2,8 +2,6 @@
 
 """
 deep Neural Networks obtain categorcial features embedding
-
-@author: Moon
 """
 import os
 import pandas as pd
