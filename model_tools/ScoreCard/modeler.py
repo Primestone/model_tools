@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on 17-9-22
+score card model utils
 """
 
 import pandas as pd
