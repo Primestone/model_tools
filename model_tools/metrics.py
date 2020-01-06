@@ -2,8 +2,6 @@
 
 """
 Common Evaluation Metrics
-
-@author: Moon
 """
 
 import numpy as np
