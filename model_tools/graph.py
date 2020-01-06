@@ -2,8 +2,6 @@
 
 """
 visual
-
-@author: Moon
 """
 
 import pandas as pd
