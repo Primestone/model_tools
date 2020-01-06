@@ -1,5 +1,6 @@
 """
 A tool to measure variable's distribution between train and test.
+Add binning method
 """
 
 import pandas as pd
