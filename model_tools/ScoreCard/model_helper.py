@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+score card model helper
+"""
 
 import numpy as np
 import pandas as pd
