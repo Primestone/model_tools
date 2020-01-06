@@ -4,8 +4,6 @@ A tool to measure variable's distribution between train and test.
 
 import pandas as pd
 import numpy as np
-from matplotlib import pyplot as plt
-
 
 class stable_evalutor(object):
 
