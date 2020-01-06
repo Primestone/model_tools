@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-
+"""
+target encoder base estimator
+"""
 import numpy as np
 import pandas as pd
 from numpy.random.mtrand import normal, multivariate_normal
