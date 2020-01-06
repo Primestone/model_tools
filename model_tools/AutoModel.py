@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 Auto XGBoost and Auto Scorecard
-@author: tangyangyang
 """
+
 import pickle
 import cloudpickle
 import varclushi
