@@ -3,7 +3,6 @@
 """
 lightgbm train sklearn-wrapper add some new func.
 
-@author: Moon
 """
 
 from sklearn.base import BaseEstimator, ClassifierMixin
