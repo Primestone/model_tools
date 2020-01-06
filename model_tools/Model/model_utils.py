@@ -2,8 +2,6 @@
 
 """
 KFolds Classifier Base on Scikit-Learn wrapper. (LightGBM, XGBoost...)
-
-@author: Moon
 """
 import pandas as pd
 import numpy as np
