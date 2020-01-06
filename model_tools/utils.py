@@ -2,8 +2,6 @@
 
 """
 utils
-
-@author: Moon
 """
 
 import time
