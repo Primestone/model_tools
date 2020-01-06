@@ -2,8 +2,6 @@
 
 """
 catboost classifier add some new func.
-
-@author: Moon
 """
 
 from catboost import CatBoostClassifier
