@@ -81,27 +81,50 @@ class CatboostClassifierKFold(BaseEstimator, ClassifierMixin):
             self.bst = []
             score_list = []
             n_folds = int(self.predict_method.split('_')[1])
-            skf = StratifiedKFold(n_splits=n_folds, shuffle=False, random_state=self.random_seed)
+            skf = StratifiedKFold(
+                n_splits=n_folds,
+                shuffle=False,
+                random_state=self.random_seed)
             for trn_ind, val_ind in skf.split(X, y):
                 X_trn, X_val = X.iloc[trn_ind, :], X.iloc[val_ind, :]
                 y_trn, y_val = y.values[trn_ind], y[val_ind]
                 cat_model = CatBoostClassifier(**param)
-                cat_model.fit(X_trn, y_trn, eval_set=(X_val, y_val),
-                              cat_features=self.cat_features_inds, use_best_model=True, verbose=self.verbose)
+                cat_model.fit(
+                    X_trn,
+                    y_trn,
+                    eval_set=(
+                        X_val,
+                        y_val),
+                    cat_features=self.cat_features_inds,
+                    use_best_model=True,
+                    verbose=self.verbose)
 
                 self.bst.append(cat_model)
-                score = roc_auc_score(y_val, cat_model.predict_proba(X_val)[:, 1])
+                score = roc_auc_score(
+                    y_val, cat_model.predict_proba(X_val)[
+                        :, 1])
                 score_list.append(score)
 
             self.score_avg = np.mean(score_list)
             self.score_std = np.std(score_list)
-            print("cross validation get score: {0} ± {1} ".format(round(np.mean(score_list), 4),
-                                                                  round(np.std(score_list), 4)))
+            print(
+                "cross validation get score: {0} ± {1} ".format(
+                    round(
+                        np.mean(score_list), 4), round(
+                        np.std(score_list), 4)))
         elif self.predict_method == 'split_tune':
-            X_trn, X_val, y_trn, y_val = train_test_split(X, y, test_size=0.2, random_state=self.random_seed)
+            X_trn, X_val, y_trn, y_val = train_test_split(
+                X, y, test_size=0.2, random_state=self.random_seed)
             cat_model = CatBoostClassifier(**param)
-            cat_model.fit(X_trn, y_trn, eval_set=(X_val, y_val),
-                          cat_features=self.cat_features_inds, use_best_model=True, verbose=self.verbose)
+            cat_model.fit(
+                X_trn,
+                y_trn,
+                eval_set=(
+                    X_val,
+                    y_val),
+                cat_features=self.cat_features_inds,
+                use_best_model=True,
+                verbose=self.verbose)
             self.bst = cat_model
             score = roc_auc_score(y_val, cat_model.predict_proba(X_val)[:, 1])
             print("cross validation get score: {} ".format(round(score)))
@@ -131,9 +154,9 @@ class CatboostClassifierKFold(BaseEstimator, ClassifierMixin):
             feature_imp = pd.DataFrame({'variable': self.predict_cols})
             feature_imp['importance'] = 0
             for bst in self.bst:
-                feature_imp['importance'] += bst.feature_importances_ / len(self.bst)
+                feature_imp['importance'] += bst.feature_importances_ / \
+                    len(self.bst)
         else:
             feature_imp = pd.DataFrame({'variable': self.predict_cols})
             feature_imp['importance'] = self.bst.feature_importances_
         return feature_imp.sort_values(by=['importance'], ascending=False)
-

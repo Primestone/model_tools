@@ -20,8 +20,17 @@ from keras.optimizers import Adam, Nadam
 
 class EarlyStopping(Callback):
 
-    def __init__(self, training_data=False, validation_data=False, testing_data=False, min_delta=0, patience=0,
-                 test_check=False, model_file=None, scoring=ks, verbose=0):
+    def __init__(
+            self,
+            training_data=False,
+            validation_data=False,
+            testing_data=False,
+            min_delta=0,
+            patience=0,
+            test_check=False,
+            model_file=None,
+            scoring=ks,
+            verbose=0):
         super(EarlyStopping, self).__init__()
         self.best_epoch = 0
         self.patience = patience
@@ -75,13 +84,19 @@ class EarlyStopping(Callback):
         else:
             score_te = 0
         metric_name = getattr(self.scoring, '__name__')
-        print('{0}_train: {1} - {0}_val: {2} - {0}_test: {3}'.format(metric_name, str(round(score_tr, 6)),
-                                                                     str(round(score_val, 6)),
-                                                                     str(round(score_te, 6))), end=100*' '+'\n')
+        print(
+            '{0}_train: {1} - {0}_val: {2} - {0}_test: {3}'.format(
+                metric_name, str(
+                    round(
+                        score_tr, 6)), str(
+                    round(
+                        score_val, 6)), str(
+                            round(
+                                score_te, 6))), end=100 * ' ' + '\n')
 
         if self.model_file:
-            print("saving", self.model_file+'.'+str(epoch))
-            self.model.save_weights(self.model_file+'.'+str(epoch))
+            print("saving", self.model_file + '.' + str(epoch))
+            self.model.save_weights(self.model_file + '.' + str(epoch))
 
         if self.x_val:
             if self.test_check:
@@ -101,9 +116,22 @@ class EarlyStopping(Callback):
 
 class DNN(BaseEstimator, ClassifierMixin):
 
-    def __init__(self, train, valid, test, predictors, categorical_features, target, params, fixemb=True,
-                 sameNDenseAsEmb=True, numeDropout=True, NumeBatchNormalization=True, train_check=True,
-                 test_check=False, seed=1024):
+    def __init__(
+            self,
+            train,
+            valid,
+            test,
+            predictors,
+            categorical_features,
+            target,
+            params,
+            fixemb=True,
+            sameNDenseAsEmb=True,
+            numeDropout=True,
+            NumeBatchNormalization=True,
+            train_check=True,
+            test_check=False,
+            seed=1024):
         self.train = train
         self.valid = valid
         self.test = test
@@ -162,7 +190,8 @@ class DNN(BaseEstimator, ClassifierMixin):
                 test_dict[col] = np.array(test_x[col])
                 inpt = Input(shape=[1], name=col)
                 input_list.append(inpt)
-                max_val = np.max([trn_x[col].max(), vld_x[col].max(), test_x[col].max()]) + 1
+                max_val = np.max(
+                    [trn_x[col].max(), vld_x[col].max(), test_x[col].max()]) + 1
                 emb_n = np.min([emb_cate, max_val])
                 if self.fixemb:
                     emb_n = emb_cate
@@ -170,8 +199,15 @@ class DNN(BaseEstimator, ClassifierMixin):
                 if emb_n == 1:
                     print("emb_1 = 1")
                     return 0
-                print('Embedding size:', max_val, emb_cate, trn_x[col].max(), vld_x[col].max(), test_x[col].max(), emb_n,
-                      col)
+                print(
+                    'Embedding size:',
+                    max_val,
+                    emb_cate,
+                    trn_x[col].max(),
+                    vld_x[col].max(),
+                    test_x[col].max(),
+                    emb_n,
+                    col)
                 embd = Embedding(max_val, emb_n)(inpt)
                 emb_list.append(embd)
             if len(emb_list) == 1:
@@ -191,7 +227,11 @@ class DNN(BaseEstimator, ClassifierMixin):
             input_list.append(inpt)
             x2 = inpt
             for n in range(dense_nume_n_layers):
-                x2 = Dense(dense_cate, activation='relu', kernel_initializer=RandomUniform(seed=self.seed))(x2)
+                x2 = Dense(
+                    dense_cate,
+                    activation='relu',
+                    kernel_initializer=RandomUniform(
+                        seed=self.seed))(x2)
                 if self.numeDropout:
                     x2 = Dropout(drop)(x2)
                 if self.NumeBatchNormalization:
@@ -207,12 +247,20 @@ class DNN(BaseEstimator, ClassifierMixin):
             return 0  # for small data test
 
         for n in range(n_layers):
-            x = Dense(dense_cate, activation='relu', kernel_initializer=RandomUniform(seed=self.seed))(x)
+            x = Dense(
+                dense_cate,
+                activation='relu',
+                kernel_initializer=RandomUniform(
+                    seed=self.seed))(x)
             if lastdropout:
                 x = Dropout(drop)(x)
             if batchnormalization:
                 x = BatchNormalization()(x)
-        outp = Dense(1, activation='sigmoid', kernel_initializer=RandomUniform(seed=self.seed))(x)
+        outp = Dense(
+            1,
+            activation='sigmoid',
+            kernel_initializer=RandomUniform(
+                seed=self.seed))(x)
         model = Model(inputs=input_list, outputs=outp)
         if optim == 'adam':
             optimizer = Adam(lr=lr)
@@ -268,25 +316,39 @@ class DNN(BaseEstimator, ClassifierMixin):
         return self
 
     def predict(self, X=None):
-        valid_preds = pd.DataFrame([i+1 for i in range(self.valid.shape[0])], columns=['index'])
-        test_preds = self.model.predict(self.test_dict, batch_size=int(self.params['batch_size']),
-                                        verbose=2)[:, 0]
-        valid_preds['pred'] = self.model.predict(self.valid_dict, batch_size=int(self.params['batch_size']),
-                                                 verbose=2)[:, 0]
+        valid_preds = pd.DataFrame(
+            [i + 1 for i in range(self.valid.shape[0])], columns=['index'])
+        test_preds = self.model.predict(
+            self.test_dict,
+            batch_size=int(
+                self.params['batch_size']),
+            verbose=2)[
+            :,
+            0]
+        valid_preds['pred'] = self.model.predict(
+            self.valid_dict, batch_size=int(
+                self.params['batch_size']), verbose=2)[
+            :, 0]
 
         metric_name = getattr(self.earlystopping.scoring, '__name__')
-        score = self.earlystopping.scoring(self.valid[self.target], valid_preds['pred'])
+        score = self.earlystopping.scoring(
+            self.valid[self.target], valid_preds['pred'])
         print("valid dataset {}. {}".format(metric_name, score))
         return test_preds
 
     def predict_proba(self, X=None):
-        valid_preds = pd.DataFrame([i+1 for i in range(self.valid.shape[0])], columns=['index'])
-        test_preds = self.model.predict(self.test_dict, batch_size=int(self.params['batch_size']),
-                                        verbose=2)
-        valid_preds['pred'] = self.model.predict(self.valid_dict, batch_size=int(self.params['batch_size']),
-                                                 verbose=2)[:, 0]
+        valid_preds = pd.DataFrame(
+            [i + 1 for i in range(self.valid.shape[0])], columns=['index'])
+        test_preds = self.model.predict(
+            self.test_dict, batch_size=int(
+                self.params['batch_size']), verbose=2)
+        valid_preds['pred'] = self.model.predict(
+            self.valid_dict, batch_size=int(
+                self.params['batch_size']), verbose=2)[
+            :, 0]
 
         metric_name = getattr(self.earlystopping.scoring, '__name__')
-        score = self.earlystopping.scoring(self.valid[self.target], valid_preds['pred'])
+        score = self.earlystopping.scoring(
+            self.valid[self.target], valid_preds['pred'])
         print("valid dataset {}. {}".format(metric_name, score))
         return test_preds
