@@ -17,7 +17,7 @@ from sklearn.linear_model import LogisticRegression
 from .data import DataHelper
 from .Preprocessing.stabler import get_trend_stats
 from .metrics import roc_auc_score, ks
-from .Model.model_utils import GreedyThresholdSelector
+from .Model.model_utils import GreedyThresholdSelector, GreedyThresholdSelector1
 from .Model.params_tune import XGBoostBayesOptim
 import xgboost as xgb
 from xgboost.sklearn import XGBClassifier
@@ -52,14 +52,8 @@ class CategoryEncoder(BaseEstimator, TransformerMixin):
             x = x.reshape(-1, 1)
 
         for i in self.categorical_features:
-            try:
-                enc = LabelEncoder().fit(x.loc[:, i])
-                self.encoders.update({i: enc})
-            except BaseException:
-                ind_v = x.loc[:, i].drop_duplicates().fillna(
-                    "").reset_index(drop=True).to_dict()
-                v_ind = {v: k for k, v in ind_v.items()}
-                self.encoders.update({i: v_ind})
+            ind_v = x[i].fillna("").value_counts().rank(ascending=0, method='first').astype(int).to_dict()
+            self.encoders.update({i: ind_v})
 
         return self
 
@@ -82,10 +76,7 @@ class CategoryEncoder(BaseEstimator, TransformerMixin):
 
         for i in inner_categorical:
             enc = self.encoders[i]
-            if hasattr(enc, 'transform'):
-                x.loc[:, i] = enc.transform(x.loc[:, i]) + self.first_category
-            else:
-                x.loc[:, i] = x.loc[:, i].fillna("").map(enc)
+            x.loc[:, i] = x.loc[:, i].fillna("").map(enc)
         X[inner_categorical] = x.values
 
         return X
@@ -157,6 +148,7 @@ class AutoXGBoost(object):
             target,
             key,
             unuse_variables,
+            categorical_features,
             date_cols,
             missing_rate_threshold,
             select_min,
@@ -172,6 +164,7 @@ class AutoXGBoost(object):
         self.target = target
         self.key = key
         self.unuse_variables = unuse_variables
+        self.categorical_features = categorical_features
         self.date_cols = date_cols
         self.missing_rate_threshold = missing_rate_threshold
         self.select_min = select_min
@@ -200,9 +193,9 @@ class AutoXGBoost(object):
                                    date_cols=self.date_cols)
         data = self.datahper.combine()
         dtypes = data.dtypes
-        object_features = self.datahper.object_features
-        self.categorical_variables = dtypes[dtypes == 'object'].index.tolist() if len(
-            object_features) == 0 else object_features
+        # object_features = self.datahper.object_features
+        self.categorical_variables = dtypes[dtypes == 'object'].index.tolist() if self.categorical_features is None \
+                                                                                  or self.categorical_features == [] else self.categorical_features
         self.continues_features = self.datahper.continues_features
         self.bool_variables = dtypes[dtypes == 'bool'].index.tolist()
         for col in self.bool_variables:
@@ -223,24 +216,35 @@ class AutoXGBoost(object):
         return self
 
     def _feature_engineer(self):
-        pipe = Pipeline([
-            ('CatgoryEncoder', CategoryEncoder(self.categorical_variables)),
-            ('CountEncoder', CountEncoder(self.categorical_variables)),
-        ])
-        self.data = pipe.fit_transform(self.data)
-        self.train, self.test = self.datahper.split(self.data)
-        self.data_report = model_helper.data_report(self.train)
-
         variable_filter = self.data_report[self.data_report['unique'] > 1]
         variable_filter = variable_filter[~(
-            (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 20))]
+                (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 20))]
         variable_filter = variable_filter[variable_filter['missing_rate']
                                           <= self.missing_rate_threshold]
         variable_filter = variable_filter[variable_filter['dtype']
                                           != 'datetime64[ns]']
-        use_cols = list(variable_filter['column'])
-        use_cols = [x for x in use_cols if x not in [self.key]]
+        filt_variables = list(variable_filter['column'])
+        if self.key not in filt_variables:
+            filt_variables.append(self.key)
+        self.categorical_variables = [x for x in self.categorical_variables if x in filt_variables]
 
+        pipe = Pipeline([
+            ('CatgoryEncoder', CategoryEncoder(self.categorical_variables)),
+            ('CountEncoder', CountEncoder(self.categorical_variables)),
+        ])
+        self.data = pipe.fit_transform(self.data[filt_variables])
+        self.train, self.test = self.datahper.split(self.data)
+        # self.data_report = model_helper.data_report(self.train)
+        # variable_filter = self.data_report[self.data_report['unique'] > 1]
+        # variable_filter = variable_filter[~(
+        #    (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 20))]
+        # variable_filter = variable_filter[variable_filter['missing_rate']
+        #                                   <= self.missing_rate_threshold]
+        # variable_filter = variable_filter[variable_filter['dtype']
+        #                                   != 'datetime64[ns]']
+        # use_cols = list(variable_filter['column'])
+        # use_cols = [x for x in use_cols if x not in [self.key]]
+        use_cols = [x for x in self.train.columns if x not in [self.key, self.target]]
         self.train[use_cols] = self.train[use_cols].fillna(-999)
         self.test[use_cols] = self.test[use_cols].fillna(-999)
         self.use_cols = use_cols
@@ -279,7 +283,7 @@ class AutoXGBoost(object):
                                    sample_weight=None, seed=1001  # init_score=0.5
                                    )
 
-        result = GreedyThresholdSelector(
+        shap_correlation, result = GreedyThresholdSelector1(
             self.train[self.use_cols],
             self.target,
             self.test[self.use_cols],
@@ -292,9 +296,14 @@ class AutoXGBoost(object):
             [1001])
         self.gs_result = result
 
-        result.to_excel(
+        shap_correlation.to_excel(
             self.output_file +
-            "{0}_GS_Result.xlsx".format(self.project_name),
+            "{0}_Shap_Importance.xlsx".format(self.project_name),
+            index=False)
+
+        result.to_csv(
+            self.output_file +
+            "{0}_GS_Result.csv".format(self.project_name),
             index=False)
         init_variables = result.sort_values('test_auc', ascending=False).head(1)[
             'sub_columns'].values[0]
@@ -308,7 +317,8 @@ class AutoXGBoost(object):
             save=True):
         assert hasattr(
             self, 'init_variables') or sel_cols is not None, "Before run xgboost model, must select variables."
-        if (not hasattr(self, 'init_variables')) and sel_cols is not None and not hasattr(self, 'sel_cols'):
+        if (not hasattr(self, 'init_variables')
+        ) and sel_cols is not None and not hasattr(self, 'sel_cols'):
             self._data_preprocess()
             self._data_combine()
             self._data_report()
@@ -393,21 +403,21 @@ class AutoXGBoost(object):
                     "{0}_input_variables.pkl".format(
                         self.project_name), 'wb'))
 
-            importance_df.to_excel(
+            importance_df.to_csv(
                 self.output_file +
-                "{0}_Feature_Importance.xlsx".format(self.project_name),
+                "{0}_Feature_Importance.csv".format(self.project_name),
                 index=False)
 
             group_analysis = model_helper.model_group_monitor(
                 self.test, self.target, 'proba')
-            group_analysis.to_excel(
+            group_analysis.to_csv(
                 self.output_file +
-                "{0}_Group_Analysis.xlsx".format(self.project_name),
+                "{0}_Group_Analysis.csv".format(self.project_name),
                 index=False)
 
-            self.test.to_excel(
+            self.test[[self.key, self.target, 'proba']].to_csv(
                 self.output_file +
-                "{0}_Test_Sample.xlsx".format(self.project_name),
+                "{0}_Test_Sample.csv".format(self.project_name),
                 index=False)
 
     def optim_params(self, init_points=5, n_iter=15):
@@ -499,17 +509,34 @@ class AutoScoreCard(object):
         return self
 
     def binWoe(self):
-        bins = sc.woebin(self.train[self.use_cols], y=self.target, bin_num_limit=self.bin_num_limit, method=self.bin_method)
-        pickle.dump(bins, open(self.output_file+'{0}_{1}_bins.pkl'.format(self.project_name, self.bin_method), 'wb'))
+        bins = sc.woebin(self.train[self.use_cols],
+                         y=self.target,
+                         bin_num_limit=self.bin_num_limit,
+                         method=self.bin_method)
+        pickle.dump(
+            bins,
+            open(
+                self.output_file +
+                '{0}_{1}_bins.pkl'.format(
+                    self.project_name,
+                    self.bin_method),
+                'wb'))
         bins_df = pd.DataFrame()
         for k, v in bins.items():
             bins_df = pd.concat([bins_df, v])
 
         bins_df.sort_values(['total_iv', 'breaks'], ascending=[
             False, True], inplace=True)
-        bins_df.to_excel(self.output_file+'{0}_{1}_bins_df.xlsx'.format(self.project_name, self.bin_method), index=False)
-        self.dev_woe = sc.woebin_ply(self.train[self.use_cols], bins, no_cores=4)
-        self.oot_woe = sc.woebin_ply(self.test[self.use_cols], bins, no_cores=4)
+        bins_df.to_excel(
+            self.output_file +
+            '{0}_{1}_bins_df.xlsx'.format(
+                self.project_name,
+                self.bin_method),
+            index=False)
+        self.dev_woe = sc.woebin_ply(
+            self.train[self.use_cols], bins, no_cores=4)
+        self.oot_woe = sc.woebin_ply(
+            self.test[self.use_cols], bins, no_cores=4)
         self.bins = bins
         self.bins_df = bins_df
         return self
@@ -520,7 +547,7 @@ class AutoScoreCard(object):
         self._variables_filter()
         self.binWoe()
         sel_cols = self.bins_df[self.bins_df['total_iv'] >=
-                           0.02]['variable'].drop_duplicates().tolist()
+                                0.02]['variable'].drop_duplicates().tolist()
         dtypes = self.train[sel_cols].dtypes
         numeric_cols = dtypes[dtypes != 'object'].index.tolist()
 
@@ -530,14 +557,24 @@ class AutoScoreCard(object):
         varclus_proc.varclus()
         self.varclus_info = varclus_proc.info
         self.varclus_result = varclus_proc.rsquare
-        self.varclus_result.to_excel(self.output_file+'{0}_varclus_result.xlsx'.format(self.project_name), index=False)
+        self.varclus_result.to_excel(
+            self.output_file +
+            '{0}_varclus_result.xlsx'.format(
+                self.project_name),
+            index=False)
         varclus_iv = self.varclus_result.merge(
             self.bins_df[['Variable', 'total_iv']].drop_duplicates(), on='Variable', how='left')
         varclus_iv.sort_values(by=['Cluster', 'total_iv'],
                                ascending=[True, False], inplace=True)
-        varclus_iv['rank'] = varclus_iv.groupby('Cluster')['total_iv'].rank(ascending=False)
-        varclus_iv.to_excel(self.output_file+'{0}_varclus_iv.xlsx'.format(self.project_name), index=False)
-        sw_df = varclus_iv[varclus_iv['rank']<=2].sort_values('total_iv', ascending=False)
+        varclus_iv['rank'] = varclus_iv.groupby(
+            'Cluster')['total_iv'].rank(ascending=False)
+        varclus_iv.to_excel(
+            self.output_file +
+            '{0}_varclus_iv.xlsx'.format(
+                self.project_name),
+            index=False)
+        sw_df = varclus_iv[varclus_iv['rank'] <= 2].sort_values(
+            'total_iv', ascending=False)
         self.sw_input = sw_df['Variable'].tolist()[:70]
         return self
 
@@ -546,8 +583,8 @@ class AutoScoreCard(object):
             sw_input = sw_input
         else:
             sw_input = self.sw_input
-        sw = modeler.StepwiseModel(self.dev_woe[self.sw_input], self.dev_woe[self.target],
-                                   method='stepwise')
+        sw = modeler.StepwiseModel(
+            self.dev_woe[self.sw_input], self.dev_woe[self.target], method='stepwise')
         sw_result = sw.stepwise()
         self.input_cols = [x for x in sw_result.keys() if x != 'const']
         return self
@@ -555,13 +592,21 @@ class AutoScoreCard(object):
     def logit_fit(self):
         lr = LogisticRegression(penalty='l1', C=0.9, solver='saga', n_jobs=-1)
         lr.fit(self.dev_woe[self.input_cols], self.dev_woe[self.target])
-        pickle.dump(lr, open(self.output_file+"{0}_LRModel.pkl".format(self.project_name), 'wb'))
+        pickle.dump(
+            lr,
+            open(
+                self.output_file +
+                "{0}_LRModel.pkl".format(
+                    self.project_name),
+                'wb'))
         dev_pred = lr.predict_proba(self.dev_woe[self.input_cols])[:, 1]
         oot_pred = lr.predict_proba(self.oot_woe[self.input_cols])[:, 1]
-        print("="*6+" DEV PERFERMANCE "+"="*6)
-        dev_perf = sc.perf_eva(self.dev_woe[self.target], dev_pred, title="DEV")
+        print("=" * 6 + " DEV PERFERMANCE " + "=" * 6)
+        dev_perf = sc.perf_eva(
+            self.dev_woe[self.target], dev_pred, title="DEV")
         print("=" * 6 + " OOT PERFERMANCE " + "=" * 6)
-        oot_perf = sc.perf_eva(self.oot_woe[self.target], oot_pred, title="OOT")
+        oot_perf = sc.perf_eva(
+            self.oot_woe[self.target], oot_pred, title="OOT")
 
         orig_cols = [x[:-4] for x in self.input_cols]
         self.card = sc.scorecard(self.bins, lr, self.train[orig_cols].columns)
