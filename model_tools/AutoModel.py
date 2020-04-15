@@ -52,7 +52,8 @@ class CategoryEncoder(BaseEstimator, TransformerMixin):
             x = x.reshape(-1, 1)
 
         for i in self.categorical_features:
-            ind_v = x[i].fillna("").value_counts().rank(ascending=0, method='first').astype(int).to_dict()
+            ind_v = x[i].fillna("").value_counts().rank(
+                ascending=0, method='first').astype(int).to_dict()
             self.encoders.update({i: ind_v})
 
         return self
@@ -194,8 +195,8 @@ class AutoXGBoost(object):
         data = self.datahper.combine()
         dtypes = data.dtypes
         # object_features = self.datahper.object_features
-        self.categorical_variables = dtypes[dtypes == 'object'].index.tolist() if self.categorical_features is None \
-                                                                                  or self.categorical_features == [] else self.categorical_features
+        self.categorical_variables = dtypes[dtypes == 'object'].index.tolist(
+        ) if self.categorical_features is None or self.categorical_features == [] else self.categorical_features
         self.continues_features = self.datahper.continues_features
         self.bool_variables = dtypes[dtypes == 'bool'].index.tolist()
         for col in self.bool_variables:
@@ -218,7 +219,7 @@ class AutoXGBoost(object):
     def _feature_engineer(self):
         variable_filter = self.data_report[self.data_report['unique'] > 1]
         variable_filter = variable_filter[~(
-                (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 20))]
+            (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 20))]
         variable_filter = variable_filter[variable_filter['missing_rate']
                                           <= self.missing_rate_threshold]
         variable_filter = variable_filter[variable_filter['dtype']
@@ -226,7 +227,8 @@ class AutoXGBoost(object):
         filt_variables = list(variable_filter['column'])
         if self.key not in filt_variables:
             filt_variables.append(self.key)
-        self.categorical_variables = [x for x in self.categorical_variables if x in filt_variables]
+        self.categorical_variables = [
+            x for x in self.categorical_variables if x in filt_variables]
 
         pipe = Pipeline([
             ('CatgoryEncoder', CategoryEncoder(self.categorical_variables)),
@@ -244,7 +246,9 @@ class AutoXGBoost(object):
         #                                   != 'datetime64[ns]']
         # use_cols = list(variable_filter['column'])
         # use_cols = [x for x in use_cols if x not in [self.key]]
-        use_cols = [x for x in self.train.columns if x not in [self.key, self.target]]
+        use_cols = [
+            x for x in self.train.columns if x not in [
+                self.key, self.target]]
         self.train[use_cols] = self.train[use_cols].fillna(-999)
         self.test[use_cols] = self.test[use_cols].fillna(-999)
         self.use_cols = use_cols
@@ -318,7 +322,7 @@ class AutoXGBoost(object):
         assert hasattr(
             self, 'init_variables') or sel_cols is not None, "Before run xgboost model, must select variables."
         if (not hasattr(self, 'init_variables')
-        ) and sel_cols is not None and not hasattr(self, 'sel_cols'):
+            ) and sel_cols is not None and not hasattr(self, 'sel_cols'):
             self._data_preprocess()
             self._data_combine()
             self._data_report()
@@ -498,7 +502,7 @@ class AutoScoreCard(object):
 
         variable_filter = self.data_report[self.data_report['unique'] > 1]
         variable_filter = variable_filter[~(
-                (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 30))]
+            (variable_filter['dtype'] == 'object') & (variable_filter['unique'] >= 30))]
         variable_filter = variable_filter[variable_filter['missing_rate']
                                           <= self.missing_rate_threshold]
         variable_filter = variable_filter[variable_filter['dtype']
